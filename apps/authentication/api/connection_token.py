@@ -1296,13 +1296,22 @@ class SuperConnectionTokenViewSet(ConnectionTokenViewSet):
             # has been consumed. Revalidate access without reviving that token.
             instance.is_valid(check_expiration=False)
             if not instance.personal_credential_id:
-                self._validate_perm(
+                account = self._validate_perm(
                     instance.user,
                     instance.asset,
                     instance.account,
                     instance.protocol,
                     token_type=instance.type,
                 )
+                from perms.const import ActionChoices
+                from perms.serializers.permission import ActionChoicesField
+
+                actions = (
+                    ActionChoices.all()
+                    if instance.type == ConnectionTokenType.ADMIN
+                    else account.actions
+                )
+                data['actions'] = ActionChoicesField().to_representation(actions)
         except JMSException as e:
             data['code'] = e.detail.code
             data['detail'] = str(e.detail)

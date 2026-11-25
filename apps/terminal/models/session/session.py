@@ -45,6 +45,11 @@ class Session(OrgModelMixin):
     cmd_amount = models.IntegerField(default=-1, verbose_name=_("Command amount"))
     error_reason = models.CharField(max_length=128, blank=True, verbose_name=_("Error reason"))
     replay_size = models.BigIntegerField(default=0, verbose_name=_("Replay size"))
+    # PAM MP4 V15 - Audit Duration Enhancement
+    replay_duration_ms = models.PositiveBigIntegerField(
+        null=True, blank=True, editable=False,
+        verbose_name=_("Replay duration (ms)")
+    )
 
     upload_to = 'replay'
     ACTIVE_CACHE_KEY_PREFIX = 'SESSION_ACTIVE_{}'

@@ -287,3 +287,126 @@ def cleanup_replay_mp4_exports():
 def export_rdp_replay_mp4(session_id, job_id):
     from .replay_rdp import convert_rdp_job
     convert_rdp_job(session_id, job_id)
+
+
+# PAM MP4 V15 - Audit Duration Enhancement
+@shared_task(
+    verbose_name=_('Update session replay durations'),
+    description=_('Read recording metadata without converting MP4'),
+    soft_time_limit=90,
+    time_limit=120,
+)
+@register_as_period_task(interval=60)
+@after_app_ready_start
+def update_replay_durations():
+    import time
+    import uuid
+
+    from celery.exceptions import SoftTimeLimitExceeded
+    from django.core.cache import cache
+    from orgs.utils import tmp_to_org
+    from .replay_duration import read_session_duration
+
+    batch_size = 25
+    deadline = time.monotonic() + 40
+
+    lock_key = 'pam:replay-duration:v15:lock'
+    cursor_key = 'pam:replay-duration:v15:cursor'
+    owner = str(uuid.uuid4())
+
+    if not cache.add(lock_key, owner, timeout=180):
+        return
+
+    scanned = 0
+    updated = 0
+    unavailable = 0
+
+    try:
+        with tmp_to_root_org():
+            queryset = Session.objects.filter(
+                is_finished=True,
+                has_replay=True,
+                protocol__in=('ssh', 'rdp'),
+                replay_duration_ms__isnull=True,
+            )
+
+            cursor = cache.get(cursor_key)
+
+            if cursor:
+                queryset = queryset.filter(pk__gt=cursor)
+
+            sessions = list(
+                queryset.order_by('pk')[:batch_size]
+            )
+
+            if not sessions:
+                cache.delete(cursor_key)
+                return
+
+            for session in sessions:
+                if time.monotonic() >= deadline:
+                    break
+
+                scanned += 1
+
+                cache.set(
+                    cursor_key,
+                    str(session.pk),
+                    timeout=86400,
+                )
+
+                retry_key = (
+                    f'pam:replay-duration:retry:'
+                    f'{session.pk}:{session.replay_size}'
+                )
+
+                if cache.get(retry_key):
+                    continue
+
+                # Avoid repeatedly processing unavailable or invalid files.
+                cache.set(retry_key, True, timeout=900)
+
+                try:
+                    with tmp_to_org(session.org):
+                        duration = read_session_duration(session)
+
+                except SoftTimeLimitExceeded:
+                    raise
+
+                except Exception as exc:
+                    logger.warning(
+                        'Replay duration unavailable: session=%s error=%s',
+                        session.pk,
+                        type(exc).__name__,
+                    )
+                    unavailable += 1
+                    continue
+
+                if duration is None:
+                    unavailable += 1
+                    continue
+
+                count = Session.objects.filter(
+                    pk=session.pk,
+                    org_id=session.org_id,
+                    protocol=session.protocol,
+                    replay_size=session.replay_size,
+                    is_finished=True,
+                    has_replay=True,
+                    replay_duration_ms__isnull=True,
+                ).update(
+                    replay_duration_ms=duration
+                )
+
+                if count:
+                    updated += count
+                    cache.delete(retry_key)
+
+            logger.info(
+                'Replay duration batch: scanned=%s updated=%s unavailable=%s',
+                scanned, updated, unavailable,
+            )
+
+    finally:
+        if cache.get(lock_key) == owner:
+            cache.delete(lock_key)

@@ -52,7 +52,7 @@ class SessionSerializer(BulkOrgResourceModelSerializer):
             "user", "asset", "user_id", "asset_id", 'account', 'account_id',
             "protocol", 'type', "login_from", "remote_addr",
             "is_success", "is_finished", "has_replay", "has_command",
-            "date_start", "date_end", "duration", "comment", "terminal_display", "is_locked",
+            "date_start", "date_end", "duration", "replay_duration_ms", "comment", "terminal_display", "is_locked",
             'command_amount', 'error_reason', 'replay_size',
         ]
         fields_fk = ["terminal", ]
@@ -60,6 +60,10 @@ class SessionSerializer(BulkOrgResourceModelSerializer):
         fields = fields_small + fields_fk + fields_custom + ['token_id']
         extra_kwargs = {
             "duration": {'label': _('Duration')},
+            "replay_duration_ms": {
+                "read_only": True,
+                "label": _("Replay duration (ms)")
+            },
             "protocol": {'label': _('Protocol')},
             'user_id': {'label': _('User ID')},
             'asset_id': {'label': _('Asset ID')},
@@ -240,6 +244,21 @@ class SessionSerializer(BulkOrgResourceModelSerializer):
 
     def update(self, instance, validated_data):
         validated_data.pop('token_id', None)
+
+        # PAM MP4 V15 - Invalidate stale recording duration.
+        if (
+                validated_data.get('has_replay') is False
+                or (
+                    'replay_size' in validated_data
+                    and validated_data['replay_size'] != instance.replay_size
+                )
+                or (
+                    'protocol' in validated_data
+                    and validated_data['protocol'] != instance.protocol
+                )
+        ):
+            validated_data['replay_duration_ms'] = None
+
         # Components initially mark a replay as unsupported until upload completes.
         if (
                 validated_data.get('has_replay') is True and

@@ -254,3 +254,36 @@ def check_command_replay_storage_connectivity():
         return
 
     StorageConnectivityMessage(errors).publish_async()
+
+
+@shared_task(
+    verbose_name=_('Convert SSH session recording to MP4'),
+    description=_('Create a temporary MP4 when a user requests a recording download'),
+    soft_time_limit=7500,
+    time_limit=7800,
+)
+def export_ssh_replay_mp4(session_id, job_id):
+    from .replay_mp4 import convert_ssh_job
+    convert_ssh_job(session_id, job_id)
+
+
+@shared_task(
+    verbose_name=_('Clean temporary recording MP4 exports'),
+    description=_('Remove expired on-demand MP4 exports')
+)
+@register_as_period_task(interval=1800)
+@after_app_ready_start
+def cleanup_replay_mp4_exports():
+    from .replay_mp4 import cleanup_export_files
+    cleanup_export_files()
+
+
+@shared_task(
+    verbose_name=_('Convert RDP session recording to MP4'),
+    description=_('Create an on-demand MP4 from Guacamole recording parts'),
+    soft_time_limit=7500,
+    time_limit=7800,
+)
+def export_rdp_replay_mp4(session_id, job_id):
+    from .replay_rdp import convert_rdp_job
+    convert_rdp_job(session_id, job_id)

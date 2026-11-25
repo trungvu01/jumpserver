@@ -1,0 +1,9 @@
+# Use only as core-task image; rebuild pam/core:dev (with source changes) first.
+# Both bases use Debian Trixie/glibc; no Docker socket inside the worker.
+FROM ghcr.io/asciinema/agg:latest AS agg-source
+FROM pam/core:dev
+USER root
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ffmpeg fontconfig fonts-dejavu-core \
+    && rm -rf /var/lib/apt/lists/*
+COPY --from=agg-source /usr/local/bin/agg /usr/local/bin/agg

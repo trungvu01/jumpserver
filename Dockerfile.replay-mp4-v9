@@ -1,0 +1,20 @@
+# Build AFTER pam/core:mp4-v9-app and pam/rdp-guacenc:poc exist locally.
+# guacenc is copied from the isolated, successfully tested Guacamole 1.6.0 POC.
+# Original Dockerfile.replay-mp4 and SSH converter remain unchanged.
+FROM ghcr.io/asciinema/agg:latest AS agg-source
+FROM pam/rdp-guacenc:poc AS guacenc-source
+FROM pam/core:mp4-v9-app
+USER root
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+         ffmpeg fontconfig fonts-dejavu-core \
+         libcairo2 libjpeg62-turbo libpng16-16t64 libwebp7 libuuid1 \
+    && rm -rf /var/lib/apt/lists/*
+COPY --from=agg-source /usr/local/bin/agg /usr/local/bin/agg
+COPY --from=guacenc-source /usr/local/bin/guacenc /usr/local/bin/guacenc
+COPY --from=guacenc-source /usr/local/lib/ /usr/local/lib/
+RUN ldconfig \
+    && agg --version \
+    && test -x /usr/local/bin/guacenc \
+    && ! ldd /usr/local/bin/guacenc | grep -q "not found" \
+    && ffmpeg -version | head -n 1

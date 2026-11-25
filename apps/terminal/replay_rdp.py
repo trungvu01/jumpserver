@@ -45,11 +45,12 @@ RDP_GUAC_BITRATE_MAX = 12_000_000
 RDP_X264_CRF = 17
 RDP_X264_PRESET = 'superfast'  # lower CPU use than V9's 'veryfast'
 
-MAX_PARTS = 120
+# PAM MP4 V14 - Extended RDP recording limits.
+MAX_PARTS = 720
 MAX_MANIFEST = 4 * 1024 * 1024
 MAX_PART_COMPRESSED = 256 * 1024 * 1024
 MAX_PART_RAW = 384 * 1024 * 1024
-MAX_ALL_RAW = 2 * 1024 * 1024 * 1024
+MAX_ALL_RAW = 8 * 1024 * 1024 * 1024
 MAX_INTERMEDIATE = 2 * 1024 * 1024 * 1024
 PART_NAME = re.compile(r'^[0-9a-f-]{36}\.([0-9]+)\.part\.gz$', re.IGNORECASE)
 

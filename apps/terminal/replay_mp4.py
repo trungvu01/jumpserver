@@ -23,7 +23,9 @@ from django.core.files.storage import default_storage
 
 logger = logging.getLogger(__name__)
 
-JOB_TTL = 8 * 3600
+# PAM MP4 V14 - Long Recording Support
+# Up to 24h of recording, 8h processing budget and 8 GiB MP4.
+JOB_TTL = 24 * 3600
 # The browser renews this lease through authenticated status polling.
 # A closed/crashed tab can no longer renew it; background browser throttling
 # is tolerated for up to three minutes. Explicit cancel is usually faster.
@@ -31,12 +33,12 @@ CLIENT_LEASE_SECONDS = 180
 FILE_TTL = 1800
 MAX_COMPRESSED = 40 * 1024 * 1024
 MAX_CAST = 64 * 1024 * 1024
-MAX_DURATION = 4 * 3600.0
+MAX_DURATION = 24 * 3600.0
 MAX_GIF = 128 * 1024 * 1024
-MAX_MP4 = 1024 * 1024 * 1024
+MAX_MP4 = 8 * 1024 * 1024 * 1024
 SEGMENT_SECONDS = 60
 FPS = 12
-JOB_BUDGET_SECONDS = 2 * 3600
+JOB_BUDGET_SECONDS = 8 * 3600
 EXPORT_DIR = 'replay_mp4_exports'
 
 
